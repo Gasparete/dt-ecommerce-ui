@@ -1,34 +1,17 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
-import axios from "axios";
+import { useEffect, useState } from "react";
 import CustomerTable from "../components/customer/CustomerTable";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Button } from "@mui/material";
-
-const API_URL = "http://localhost:8080";
+import { Button, CircularProgress } from "@mui/material";
+import { getCustomers, deleteCustomer } from "../services/customerService";
 
 export default function CustomerList() {
-  const location = useLocation();
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const showedToast = useRef(false);
 
-  useEffect(() => {
-    if (location.state?.message && !showedToast.current) {
-      toast.success(location.state.message);
-      showedToast.current = true;
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  const fetchCustomers = async () => {
-    const res = await axios.get(`${API_URL}/customers`);
-    setCustomers(res.data);
+  const goToCreateCustomer = () => {
+    navigate(`/customers/create`);
   };
 
   const handleRowClick = (customer) => {
@@ -40,18 +23,34 @@ export default function CustomerList() {
       "Tem certeza que deseja excluir o cliente?"
     );
     if (!confirmDelete) return;
-
+    setLoading(true);
     try {
-      await axios.delete(`${API_URL}/customers/${id}`);
+      await deleteCustomer(id);
       toast.success("Cliente excluído!");
-      navigate("/customers");
+       setCustomers(prev => prev.filter(c => c.id !== id));
     } catch (error) {
       toast.error("Erro ao excluir cliente");
       console.error(error);
     } finally {
-      fetchCustomers();
+      setLoading(false);
     }
   };
+
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      setCustomers(await getCustomers());
+    } catch (error) {
+      toast.error("Erro ao carregar clientes");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
   return (
     <div className="app-container">
@@ -59,16 +58,26 @@ export default function CustomerList() {
       <Button
         variant="outlined"
         color="success"
-        onClick={() => navigate("/customers/create")}
+        onClick={goToCreateCustomer}
         sx={{ mb: 2 }}
+        disabled={loading}
       >
         Adicionar Cliente
       </Button>
-      <CustomerTable
-        customers={customers}
-        onRowClick={handleRowClick}
-        onDelete={handleDelete}
-      />
+
+      {loading ? (
+        <div
+          style={{ display: "flex", justifyContent: "center", minHeight: 300 }}
+        >
+          <CircularProgress />
+        </div>
+      ) : (
+        <CustomerTable
+          customers={customers}
+          onRowClick={handleRowClick}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }

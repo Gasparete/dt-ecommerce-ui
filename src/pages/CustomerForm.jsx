@@ -1,19 +1,17 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import { toast } from "react-toastify";
 import { Button, TextField, Stack, CircularProgress } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import ZipCodeMaskedInput from "../components/maskedInputs/ZipCodeMaskedInput";
 import CpfMaskedInput from "../components/maskedInputs/CpfMaskedInput";
+import { getCustomerById, saveCustomer } from "../services/customerService";
+import { getAddressByZipCode } from "../services/addressService";
 
-const API_URL = "http://localhost:8080";
-
-export default function CustomerFormPage() {
-  const { id } = useParams();
+export default function CustomerForm() {
   const navigate = useNavigate();
-  const isCreating = !id;
-
+  const { id } = useParams();
+  const isNew = !id;
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
   const [email, setEmail] = useState("");
@@ -22,21 +20,22 @@ export default function CustomerFormPage() {
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [stateUf, setStateUf] = useState("");
-
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [cepError, setCepError] = useState(false);
 
-  const fetchAddress = useCallback(async (zip) => {
+  const goToCustomers = () => {
+    navigate("/customers");
+  };
+
+  const fetchAddress = useCallback(async (zipCode) => {
     setLoadingAddress(true);
     setCepError(false);
-
     try {
-      const res = await axios.get(`${API_URL}/addresses/${zip}`);
-      const data = res.data;
-      setStreet(data.street || "");
-      setNeighborhood(data.neighborhood || "");
-      setCity(data.city || "");
-      setStateUf(data.state || "");
+      const address = await getAddressByZipCode(zipCode);
+      setStreet(address.street || "");
+      setNeighborhood(address.neighborhood || "");
+      setCity(address.city || "");
+      setStateUf(address.state || "");
     } catch (err) {
       setStreet("");
       setNeighborhood("");
@@ -49,30 +48,32 @@ export default function CustomerFormPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (zipCode.length === 8) {
-      fetchAddress(zipCode);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const customer = {
+      id,
+      person: { name, cpf },
+      email,
+      address: {
+        zipCode,
+        street,
+        neighborhood,
+        city,
+        state: stateUf,
+      },
+    };
+    try {
+      const { isNew } = await saveCustomer(customer);
+      toast.success(
+        isNew
+          ? "Cliente cadastrado!"
+          : "Dados atualizados!"
+      );
+      goToCustomers();
+    } catch (err) {
+      console.error("Erro ao salvar cliente:", err);
     }
-  }, [zipCode, fetchAddress]);
-
-  useEffect(() => {
-    if (id) {
-      axios
-        .get(`${API_URL}/customers/${id}`)
-        .then((res) => {
-          const c = res.data;
-          setName(c.person.name);
-          setCpf(c.person.cpf);
-          setEmail(c.email);
-          setZipCode(c.address.zipCode);
-          setStreet(c.address.street || "");
-          setNeighborhood(c.address.neighborhood || "");
-          setCity(c.address.city || "");
-          setStateUf(c.address.state || "");
-        })
-        .catch(console.error);
-    }
-  }, [id]);
+  };
 
   const isFormValid = useMemo(() => {
     return (
@@ -100,50 +101,32 @@ export default function CustomerFormPage() {
     loadingAddress,
   ]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const cleanZipCode = zipCode.replace(/\D/g, "");
-    if (
-      cleanZipCode.length !== 8 ||
-      !street ||
-      !neighborhood ||
-      !city ||
-      !stateUf ||
-      cepError
-    ) {
-      toast.error("Por favor, preencha um CEP válido antes de salvar.");
-      return;
+  useEffect(() => {
+    if (id) {
+      getCustomerById(id)
+        .then((customer) => {
+          setName(customer.person.name);
+          setCpf(customer.person.cpf);
+          setEmail(customer.email);
+          setZipCode(customer.address.zipCode);
+          setStreet(customer.address.street);
+          setNeighborhood(customer.address.neighborhood);
+          setCity(customer.address.city);
+          setStateUf(customer.address.state);
+        })
+        .catch(console.error);
     }
+  }, [id]);
 
-    const customer = {
-      person: { name, cpf },
-      email,
-      address: {
-        zipCode: cleanZipCode,
-        street,
-        neighborhood,
-        city,
-        state: stateUf,
-      },
-    };
-
-    try {
-      if (isCreating) {
-        await axios.post(`${API_URL}/customers`, customer);
-        navigate("/customers", { state: { message: "Cliente cadastrado!" } });
-      } else {
-        await axios.put(`${API_URL}/customers/${id}`, customer);
-        navigate("/customers", { state: { message: "Dados atualizados!" } });
-      }
-    } catch (err) {
-      console.error("Erro ao salvar cliente:", err);
+  useEffect(() => {
+    if (zipCode.length === 8) {
+      fetchAddress(zipCode);
     }
-  };
+  }, [zipCode, fetchAddress]);
 
   return (
-    <div className="app-container">
-      <h2>{isCreating ? "Novo Cliente" : "Editar Cliente"}</h2>
+    <div>
+      <h2>{isNew ? "Cadastrar Cliente" : "Editar Cliente"}</h2>
       <form onSubmit={handleSubmit}>
         <Stack spacing={2} direction="row" sx={{ mb: 2 }}>
           <TextField
@@ -212,7 +195,6 @@ export default function CustomerFormPage() {
             onChange={(e) => setStateUf(e.target.value)}
           />
         </Stack>
-
         <Stack spacing={2} direction="row">
           <Button
             variant="contained"
@@ -222,11 +204,7 @@ export default function CustomerFormPage() {
           >
             Salvar
           </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => navigate("/customers")}
-          >
+          <Button variant="outlined" color="error" onClick={goToCustomers}>
             Cancelar
           </Button>
         </Stack>
