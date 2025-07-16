@@ -27,7 +27,7 @@ export default function CustomerList() {
     try {
       await deleteCustomer(id);
       toast.success("Cliente excluído!");
-       setCustomers(prev => prev.filter(c => c.id !== id));
+      setCustomers(prev => prev.filter(c => c.id !== id));
     } catch (error) {
       toast.error("Erro ao excluir cliente");
       console.error(error);

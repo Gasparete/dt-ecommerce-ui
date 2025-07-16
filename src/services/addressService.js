@@ -1,5 +1,4 @@
-import * as addressApi  from "../api/addressApi";
+import api from "../api/api";
 
-export async function getAddressByZipCode(zipCode) {
-  return (await addressApi.getAddressByZipCode(zipCode)).data;
-}
+export const getAddressByZipCode = async (zipCode) =>
+  (await api.get(`/addresses/${zipCode}`).data);

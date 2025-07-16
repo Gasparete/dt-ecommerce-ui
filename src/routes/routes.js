@@ -4,7 +4,7 @@ import CustomerList from "../pages/CustomerList";
 const routes = [
   {
     path: "/",
-    element: <CustomerList />,
+    element: <CustomerList />
   },
   {
     path: "/customers",

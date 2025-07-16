@@ -1,17 +1,17 @@
-import * as customerApi from "../api/customerApi";
+import api from "../api/api";
 
-export const getCustomers = async () => (await customerApi.getCustomers()).data;
+export const getCustomers = async () => (await api.get('/customers')).data;
 
-export const getCustomerById = async (id) => (await customerApi.getCustomerById(id)).data;
+export const getCustomerById = async (id) => (await api.get(`/customers/${id}`)).data;
 
-export const deleteCustomer = (id) => customerApi.deleteCustomer(id);
+export const deleteCustomer = async (id) => await api.delete(`/customers/${id}`);
 
 export const saveCustomer = async (customer) => {
   const isNew = !customer.id;
 
   const response = isNew
-    ? await customerApi.createCustomer(customer)
-    : await customerApi.updateCustomer(customer.id, customer);
+    ? await api.post('/customers', customer)
+    : await api.put(`/customers/${customer.id}`, customer);
 
   return {
     customer: response.data,
